@@ -43,14 +43,13 @@ contract FractDao is Ownable{
     require(_supply <= settings.maxSupply(), "Supply is greater than allowed");
     
     //transfer ERC721 to the contract
+    //IERC721(_token).setApprovalForAll(address(this), true);
     IERC721(_token).safeTransferFrom(msg.sender, address(this), _id);
     
     //create new ERC20s with respective info
     newToken _newToken = new newToken(_name, _symbol);
     _newToken.mint(msg.sender, _supply);
     
-    //transfer token to user
-    //_newToken.transfer(msg.sender, _supply);
     
     //recordkeeping
     records[msg.sender] = vault(_name, _symbol, _token, _id, _supply);
