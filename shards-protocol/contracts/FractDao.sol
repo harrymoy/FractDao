@@ -47,7 +47,10 @@ contract FractDao is Ownable{
     
     //create new ERC20s with respective info
     newToken _newToken = new newToken(_name, _symbol);
-    _newToken.mint(address(this), _supply);
+    _newToken.mint(msg.sender, _supply);
+    
+    //transfer token to user
+    //_newToken.transfer(msg.sender, _supply);
     
     //recordkeeping
     records[msg.sender] = vault(_name, _symbol, _token, _id, _supply);
@@ -56,7 +59,7 @@ contract FractDao is Ownable{
     }
     
     function onERC721Received(address _operator,address _from,uint256 _tokenId,bytes calldata _data) external pure returns(bytes4){
-        return bytes4(keccak256("onERC721Received(address,uint256,bytes)"));
+        return this.onERC721Received.selector;
     }
 }
 
