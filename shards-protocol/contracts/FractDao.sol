@@ -21,9 +21,9 @@ contract newToken is ERC20 {
     }
 }
 
-contract FractDao is Ownable{
+contract FractDao is Ownable, ERC20("FractDao", "FDAO"){
     Settings private settings;
-    mapping(address=>vault) records;
+    mapping(address=>vault) public records;
     
     struct vault{
         string name;
@@ -31,15 +31,19 @@ contract FractDao is Ownable{
         address tokenAddress;
         uint256 tokenId;
         uint256 supply;
+        address newErc20Token;
         
     }
     constructor(address _settings) {
         settings = Settings(_settings);
     }
+    //mint FDAO supply
+    function mintfdao(address account, uint256 amount) public onlyOwner {
+        _mint(account, amount);
+    }
     
-    
-    //mint function
-    function mint(string memory _name, string memory _symbol, address _token, uint256 _id, uint256 _supply) external returns(bool) {
+    //mint function for client
+    function mint(string memory _name, string memory _symbol, address _token, uint256 _id, uint256 _supply) external returns(address) {
     require(_supply <= settings.maxSupply(), "Supply is greater than allowed");
     
     //transfer ERC721 to the contract
@@ -50,11 +54,13 @@ contract FractDao is Ownable{
     newToken _newToken = new newToken(_name, _symbol);
     _newToken.mint(msg.sender, _supply);
     
+    //transfer token to user
+    //_newToken.transfer(msg.sender, _supply);
     
     //recordkeeping
-    records[msg.sender] = vault(_name, _symbol, _token, _id, _supply);
+    records[msg.sender] = vault(_name, _symbol, _token, _id, _supply, address(_newToken));
     
-    return true;
+    return address(_newToken);
     }
     
     function onERC721Received(address _operator,address _from,uint256 _tokenId,bytes calldata _data) external pure returns(bytes4){
