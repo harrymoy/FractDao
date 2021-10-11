@@ -14,16 +14,53 @@ import "@openzeppelin/contracts/token/ERC721/ERC721.sol";
 
 
 contract newToken is ERC20 {
+    address[] public activeAddresses;
+    mapping(address => uint) private _indexOfAddress;
 
     constructor(string memory name_, string memory symbol_)
         ERC20(name_, symbol_)
     {
-
+      activeAddresses.push(address(0)); // the remove function seems to only work if index is > 0?
     }
 
+    function getActiveAddresses() public returns (address[] memory) {
+      return activeAddresses;
+    }
+
+    // compile active addresses - for accounts just about to receive tokens
+    function _addActiveAddress(address account) internal {
+        if (balanceOf(account) == 0) {
+          activeAddresses.push(account);
+          _indexOfAddress[account] = activeAddresses.length - 1;
+        }
+    }
+
+    // See https://ethereum.stackexchange.com/questions/35790/efficient-approach-to-delete-element-from-array-in-solidity/41025
+    function _removeActiveAddress(address account) internal {
+      if (balanceOf(account) == 0) {
+        uint index = _indexOfAddress[account];
+        if (index == 0) return;
+
+        if (activeAddresses.length > 1) {
+          activeAddresses[index] = activeAddresses[activeAddresses.length-1];
+        }
+        delete activeAddresses[activeAddresses.length - 1]; // recovers gas from last element storage
+
+        _indexOfAddress[account] = 0;
+      }
+    }
+
+    function _beforeTokenTransfer(address sender, address recipient, uint amount) internal override{
+        _addActiveAddress(recipient); // sender should already be recorded by the logic
+    }
+
+    function _afterTokenTransfer(address sender, address recipient, uint amount) internal override{
+        _removeActiveAddress(sender); // sender should already be recorded by the logic
+    }
 
     function mint(address account, uint256 amount) public {
         _mint(account, amount);
+        _addActiveAddress(account);
     }
 }
 
@@ -45,6 +82,7 @@ contract FractDao is Ownable, ERC20("FractDao", "FDAO"){
     address[] public vaultAddresses;
 
     address[] private _activeAddresses;
+    mapping(address => uint) private _indexOfAddress;
     mapping(address=>uint256) private _snapshot;
     mapping(address => bool)  private _votedList;
     mapping(uint=>uint) private _votes; // private or public? private lets people make decisions without getting influenced, but may result in a long time before votes actually work
@@ -59,6 +97,7 @@ contract FractDao is Ownable, ERC20("FractDao", "FDAO"){
 
     constructor(address _settings) {
         settings = Settings(_settings);
+        _activeAddresses.push(address(0)); // the remove function seems to only work if index is > 0?
     }
 
     modifier onlyGovernors {
@@ -70,8 +109,26 @@ contract FractDao is Ownable, ERC20("FractDao", "FDAO"){
     function _addActiveAddress(address account) internal {
         if (balanceOf(account) == 0) {
           _activeAddresses.push(account);
+          _indexOfAddress[account] = _activeAddresses.length - 1;
         }
     }
+
+    // See https://ethereum.stackexchange.com/questions/35790/efficient-approach-to-delete-element-from-array-in-solidity/41025
+    function _removeActiveAddress(address account) internal {
+      if (balanceOf(account) == 0) {
+        uint index = _indexOfAddress[account];
+        if (index == 0) return;
+
+        if (_activeAddresses.length > 1) {
+          _activeAddresses[index] = _activeAddresses[_activeAddresses.length-1];
+        }
+        delete _activeAddresses[_activeAddresses.length - 1]; // recovers gas from last element storage
+
+        _indexOfAddress[account] = 0;
+      }
+    }
+
+
 
     //mint FDAO supply
     function mintfdao(address account, uint256 amount) public onlyOwner {
@@ -120,6 +177,10 @@ contract FractDao is Ownable, ERC20("FractDao", "FDAO"){
         _addActiveAddress(recipient); // sender should already be recorded by the logic
     }
 
+    function _afterTokenTransfer(address sender, address recipient, uint amount) internal override{
+        _removeActiveAddress(sender); // sender should already be recorded by the logic
+    }
+
     // Governance - vote to increase max. supply
     function startVote() public onlyGovernors {
         // burn X amount of governance tokens so voting isn't somehow abused
@@ -165,9 +226,22 @@ contract FractDao is Ownable, ERC20("FractDao", "FDAO"){
     function endVote() public onlyGovernors {
         require(block.timestamp > voteEndBlock);
         require(_mostVotesNumber > (totalSupply() * 4 / 10)); // at least 40% of token holders agree
+
+        // How it affects current holders
+        for (uint i=0; i<vaultAddresses.length; i++) {
+            _adjustSupply(vaultAddresses[i], settings.maxSupply(), _topVotedSupply);
+        }
+
         settings.updateMaxSupply(_topVotedSupply);
         emit supplyUpdated(_topVotedSupply);
+    }
 
-        // TODO: how it affects current holders
+    function _adjustSupply(address _vaultAdd, uint _old_supply, uint _new_supply) internal {
+        newToken _vault = newToken(_vaultAdd);
+        address[] memory _allAdds = _vault.getActiveAddresses();
+        for (uint i=0; i<_allAdds.length; i++) {
+          address _acc = _allAdds[i];
+          _vault.mint(_acc, (_vault.balanceOf(_acc) * _new_supply / _old_supply) - _vault.balanceOf(_acc));
+        }
     }
 }
