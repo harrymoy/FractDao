@@ -40,6 +40,7 @@ contract FractDao is Ownable, ERC20("FractDao", "FDAO"){
 
     Settings private settings;
     mapping(address => vault) public records;
+    address[] public vaultAddresses;
 
     address[] private _activeAddresses;
     mapping(address=>uint256) private _snapshot;
@@ -93,7 +94,8 @@ contract FractDao is Ownable, ERC20("FractDao", "FDAO"){
         //_newToken.transfer(msg.sender, _supply);
 
         //recordkeeping
-        records[msg.sender] = vault(_name, _symbol, _token, _id, _supply, address(_newToken));
+        records[msg.sender] = vault(_name, _symbol, _token, _id, _supply, address(_newToken.getAddress()));
+        vaultAddresses.push(_newToken.getAddress())
 
         return address(_newToken);
     }
@@ -153,5 +155,7 @@ contract FractDao is Ownable, ERC20("FractDao", "FDAO"){
         require(_mostVotesNumber > (totalSupply() * 4 / 10)); // at least 40% of token holders agree
         settings.updateMaxSupply(_topVotedSupply);
         emit supplyUpdated(_topVotedSupply);
+
+        // TODO: how it affects current holders
     }
 }
