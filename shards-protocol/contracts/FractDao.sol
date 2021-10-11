@@ -1,6 +1,10 @@
 //SPDX-License-Identifier: Unlicensed
 pragma solidity ^0.8.9;
 
+//import "https://github.com/OpenZeppelin/openzeppelin-contracts/blob/master/contracts/access/Ownable.sol";
+//import "https://github.com/OpenZeppelin/openzeppelin-contracts/blob/master/contracts/token/ERC721/IERC721Receiver.sol";
+//import "https://github.com/OpenZeppelin/openzeppelin-contracts/blob/master/contracts/token/ERC721/ERC721.sol";
+//import "https://github.com/OpenZeppelin/openzeppelin-contracts/blob/master/contracts/token/ERC20/ERC20.sol";
 import "./Settings.sol";
 
 import "@openzeppelin/contracts/token/ERC20/ERC20.sol";
