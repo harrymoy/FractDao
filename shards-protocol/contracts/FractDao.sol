@@ -7,64 +7,13 @@ pragma solidity ^0.8.9;
 //import "https://github.com/OpenZeppelin/openzeppelin-contracts/blob/master/contracts/token/ERC20/ERC20.sol";
 import "./Settings.sol";
 
-import "@openzeppelin/contracts/token/ERC20/ERC20.sol";
+//import "@openzeppelin/contracts/token/ERC20/ERC20.sol";
 import "@openzeppelin/contracts/access/Ownable.sol";
 import "@openzeppelin/contracts/token/ERC721/IERC721Receiver.sol";
 import "@openzeppelin/contracts/token/ERC721/ERC721.sol";
+import { trackedERC20 } from "./trackedERC20.sol";
 
-
-contract newToken is ERC20 {
-    address[] public activeAddresses;
-    mapping(address => uint) private _indexOfAddress;
-
-    constructor(string memory name_, string memory symbol_)
-        ERC20(name_, symbol_)
-    {
-      activeAddresses.push(address(0)); // the remove function seems to only work if index is > 0?
-    }
-
-    function getActiveAddresses() public returns (address[] memory) {
-      return activeAddresses;
-    }
-
-    // compile active addresses - for accounts just about to receive tokens
-    function _addActiveAddress(address account) internal {
-        if (balanceOf(account) == 0) {
-          activeAddresses.push(account);
-          _indexOfAddress[account] = activeAddresses.length - 1;
-        }
-    }
-
-    // See https://ethereum.stackexchange.com/questions/35790/efficient-approach-to-delete-element-from-array-in-solidity/41025
-    function _removeActiveAddress(address account) internal {
-      if (balanceOf(account) == 0) {
-        uint index = _indexOfAddress[account];
-        if (index == 0) return;
-
-        if (activeAddresses.length > 1) {
-          activeAddresses[index] = activeAddresses[activeAddresses.length-1];
-        }
-        delete activeAddresses[activeAddresses.length - 1]; // recovers gas from last element storage
-
-        _indexOfAddress[account] = 0;
-      }
-    }
-
-    function _beforeTokenTransfer(address sender, address recipient, uint amount) internal override{
-        _addActiveAddress(recipient); // sender should already be recorded by the logic
-    }
-
-    function _afterTokenTransfer(address sender, address recipient, uint amount) internal override{
-        _removeActiveAddress(sender); // sender should already be recorded by the logic
-    }
-
-    function mint(address account, uint256 amount) public {
-        _mint(account, amount);
-        _addActiveAddress(account);
-    }
-}
-
-contract FractDao is Ownable, ERC20("FractDao", "FDAO"){
+contract FractDao is Ownable, trackedERC20("FractDao", "FDAO"){
     struct vault{
         address creator;
         string name;
@@ -81,8 +30,8 @@ contract FractDao is Ownable, ERC20("FractDao", "FDAO"){
 
     address[] public vaultAddresses;
 
-    address[] private _activeAddresses;
-    mapping(address => uint) private _indexOfAddress;
+    //address[] private _activeAddresses;
+    //mapping(address => uint) private _indexOfAddress;
     mapping(address=>uint256) private _snapshot;
     mapping(address => bool)  private _votedList;
     mapping(uint=>uint) private _votes; // private or public? private lets people make decisions without getting influenced, but may result in a long time before votes actually work
@@ -97,7 +46,7 @@ contract FractDao is Ownable, ERC20("FractDao", "FDAO"){
 
     constructor(address _settings) {
         settings = Settings(_settings);
-        _activeAddresses.push(address(0)); // the remove function seems to only work if index is > 0?
+        activeAddresses.push(address(0)); // the remove function seems to only work if index is > 0?
     }
 
     modifier onlyGovernors {
@@ -105,6 +54,7 @@ contract FractDao is Ownable, ERC20("FractDao", "FDAO"){
       _;
     }
 
+    /*
     // compile active addresses - for accounts just about to receive tokens
     function _addActiveAddress(address account) internal {
         if (balanceOf(account) == 0) {
@@ -127,7 +77,7 @@ contract FractDao is Ownable, ERC20("FractDao", "FDAO"){
         _indexOfAddress[account] = 0;
       }
     }
-
+    */
 
 
     //mint FDAO supply
@@ -155,7 +105,7 @@ contract FractDao is Ownable, ERC20("FractDao", "FDAO"){
         IERC721(_token).safeTransferFrom(msg.sender, address(this), _id);
 
         //create new ERC20s with respective info
-        newToken _newToken = new newToken(_name, _symbol);
+        trackedERC20 _newToken = new trackedERC20(_name, _symbol);
         _newToken.mint(msg.sender, _supply);
 
         //transfer token to user
@@ -173,6 +123,7 @@ contract FractDao is Ownable, ERC20("FractDao", "FDAO"){
         return this.onERC721Received.selector;
     }
 
+    /*
     function _beforeTokenTransfer(address sender, address recipient, uint amount) internal override{
         _addActiveAddress(recipient); // sender should already be recorded by the logic
     }
@@ -180,6 +131,7 @@ contract FractDao is Ownable, ERC20("FractDao", "FDAO"){
     function _afterTokenTransfer(address sender, address recipient, uint amount) internal override{
         _removeActiveAddress(sender); // sender should already be recorded by the logic
     }
+    */
 
     // Governance - vote to increase max. supply
     function startVote() public onlyGovernors {
@@ -192,9 +144,9 @@ contract FractDao is Ownable, ERC20("FractDao", "FDAO"){
         _topVotedSupply = settings.maxSupply();
         _mostVotesNumber =  0;
 
-        for (uint i=0; i<_activeAddresses.length; i++) {
-            _snapshot[_activeAddresses[i]] = balanceOf(_activeAddresses[i]);
-            _votedList[_activeAddresses[i]] = false;
+        for (uint i=0; i<activeAddresses.length; i++) {
+            _snapshot[activeAddresses[i]] = balanceOf(activeAddresses[i]);
+            _votedList[activeAddresses[i]] = false;
         }
 
         for (uint i = 0; i < _supplyVotedOn.length; i++) {
@@ -237,7 +189,7 @@ contract FractDao is Ownable, ERC20("FractDao", "FDAO"){
     }
 
     function _adjustSupply(address _vaultAdd, uint _old_supply, uint _new_supply) internal {
-        newToken _vault = newToken(_vaultAdd);
+        trackedERC20 _vault = trackedERC20(_vaultAdd);
         address[] memory _allAdds = _vault.getActiveAddresses();
         for (uint i=0; i<_allAdds.length; i++) {
           address _acc = _allAdds[i];
