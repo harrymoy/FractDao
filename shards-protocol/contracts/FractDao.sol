@@ -29,16 +29,19 @@ contract newToken is ERC20 {
 
 contract FractDao is Ownable, ERC20("FractDao", "FDAO"){
     struct vault{
+        address creator;
         string name;
         string symbol;
         address tokenAddress;
         uint256 tokenId;
         uint256 supply;
-        address newErc20Token;
+        //address newErc20Token;
     }
 
     Settings private settings;
     mapping(address => vault) public records;
+    mapping(address => mapping(uint => address)) public nftVaultMap;
+
     address[] public vaultAddresses;
 
     address[] private _activeAddresses;
@@ -81,6 +84,10 @@ contract FractDao is Ownable, ERC20("FractDao", "FDAO"){
         return vaultAddresses;
     }
 
+    function getVault(address _token, uint256 _id) external returns(address) {
+      return nftVaultMap[_token][_id];
+    }
+
 
     //mint function for client
     function mint(string memory _name, string memory _symbol, address _token, uint256 _id, uint256 _supply) external returns(address) {
@@ -98,8 +105,9 @@ contract FractDao is Ownable, ERC20("FractDao", "FDAO"){
         //_newToken.transfer(msg.sender, _supply);
 
         //recordkeeping
-        records[msg.sender] = vault(_name, _symbol, _token, _id, _supply, address(_newToken));
+        records[address(_newToken)] = vault(msg.sender, _name, _symbol, _token, _id, _supply); // changed records otherwise a user can only create 1 vault per wallet
         vaultAddresses.push(address(_newToken));
+        nftVaultMap[_token][_id] = address(_newToken);
 
         return address(_newToken);
     }
