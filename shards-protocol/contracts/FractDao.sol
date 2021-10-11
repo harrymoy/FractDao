@@ -28,9 +28,6 @@ contract newToken is ERC20 {
 }
 
 contract FractDao is Ownable, ERC20("FractDao", "FDAO"){
-    Settings private settings;
-    mapping(address=>vault) public records;
-
     struct vault{
         string name;
         string symbol;
@@ -40,6 +37,11 @@ contract FractDao is Ownable, ERC20("FractDao", "FDAO"){
         address newErc20Token;
 
     }
+
+    Settings private settings;
+    mapping(address=>vault) public records;
+
+
     constructor(address _settings) {
         settings = Settings(_settings);
     }
@@ -50,26 +52,29 @@ contract FractDao is Ownable, ERC20("FractDao", "FDAO"){
 
     //mint function for client
     function mint(string memory _name, string memory _symbol, address _token, uint256 _id, uint256 _supply) external returns(address) {
-    require(_supply <= settings.maxSupply(), "Supply is greater than allowed");
+        require(_supply <= settings.maxSupply(), "Supply is greater than allowed");
 
-    //transfer ERC721 to the contract
-    //IERC721(_token).setApprovalForAll(address(this), true);
-    IERC721(_token).safeTransferFrom(msg.sender, address(this), _id);
+        //transfer ERC721 to the contract
+        //IERC721(_token).setApprovalForAll(address(this), true);
+        IERC721(_token).safeTransferFrom(msg.sender, address(this), _id);
 
-    //create new ERC20s with respective info
-    newToken _newToken = new newToken(_name, _symbol);
-    _newToken.mint(msg.sender, _supply);
+        //create new ERC20s with respective info
+        newToken _newToken = new newToken(_name, _symbol);
+        _newToken.mint(msg.sender, _supply);
 
-    //transfer token to user
-    //_newToken.transfer(msg.sender, _supply);
+        //transfer token to user
+        //_newToken.transfer(msg.sender, _supply);
 
-    //recordkeeping
-    records[msg.sender] = vault(_name, _symbol, _token, _id, _supply, address(_newToken));
+        //recordkeeping
+        records[msg.sender] = vault(_name, _symbol, _token, _id, _supply, address(_newToken));
 
-    return address(_newToken);
+        return address(_newToken);
     }
 
     function onERC721Received(address _operator,address _from,uint256 _tokenId,bytes calldata _data) external pure returns(bytes4){
         return this.onERC721Received.selector;
     }
+
+    // Governance - vote to increase max. supply
+    //function vote(ad
 }
