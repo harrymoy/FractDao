@@ -65,7 +65,7 @@ contract newToken is ERC20 {
 }
 
 contract FractDao is Ownable, ERC20("FractDao", "FDAO"){
-    struct vault{
+    struct Vault{
         address creator;
         string name;
         string symbol;
@@ -76,8 +76,8 @@ contract FractDao is Ownable, ERC20("FractDao", "FDAO"){
     }
 
     Settings private settings;
-    mapping(address => vault) public records;
     mapping(address => mapping(uint => address)) public nftVaultMap;
+    mapping(address=>Vault) public records;
 
     address[] public vaultAddresses;
 
@@ -162,7 +162,7 @@ contract FractDao is Ownable, ERC20("FractDao", "FDAO"){
         //_newToken.transfer(msg.sender, _supply);
 
         //recordkeeping
-        records[address(_newToken)] = vault(msg.sender, _name, _symbol, _token, _id, _supply); // changed records otherwise a user can only create 1 vault per wallet
+        records[address(_newToken)] = Vault(msg.sender, _name, _symbol, _token, _id, _supply); // changed records otherwise a user can only create 1 vault per wallet
         vaultAddresses.push(address(_newToken));
         nftVaultMap[_token][_id] = address(_newToken);
 
@@ -179,6 +179,10 @@ contract FractDao is Ownable, ERC20("FractDao", "FDAO"){
 
     function _afterTokenTransfer(address sender, address recipient, uint amount) internal override{
         _removeActiveAddress(sender); // sender should already be recorded by the logic
+     }
+    function getVaultforNft(address _nftAddress) public returns(Vault) {
+        Vault vault = records[_nftAddress];
+        return vault; 
     }
 
     // Governance - vote to increase max. supply
