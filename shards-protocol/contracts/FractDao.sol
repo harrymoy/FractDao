@@ -6,7 +6,7 @@ pragma solidity ^0.8.9;
 //import "https://github.com/OpenZeppelin/openzeppelin-contracts/blob/master/contracts/token/ERC721/ERC721.sol";
 //import "https://github.com/OpenZeppelin/openzeppelin-contracts/blob/master/contracts/token/ERC20/ERC20.sol";
 import "./Settings.sol";
-
+import "./Voting.sol";
 //import "@openzeppelin/contracts/token/ERC20/ERC20.sol";
 import "@openzeppelin/contracts/access/Ownable.sol";
 import "@openzeppelin/contracts/token/ERC721/IERC721Receiver.sol";
@@ -14,14 +14,13 @@ import "@openzeppelin/contracts/token/ERC721/ERC721.sol";
 import { trackedERC20 } from "./trackedERC20.sol";
 
 contract FractDao is Ownable, trackedERC20("FractDao", "FDAO"){
-    struct vault{
+    struct Vault{
         address creator;
         string name;
         string symbol;
         address tokenAddress;
         uint256 tokenId;
         uint256 supply;
-        //address newErc20Token;
     }
 
     Settings private settings;
@@ -30,23 +29,15 @@ contract FractDao is Ownable, trackedERC20("FractDao", "FDAO"){
 
     address[] public vaultAddresses;
 
-    //address[] private _activeAddresses;
-    //mapping(address => uint) private _indexOfAddress;
-    mapping(address=>uint256) private _snapshot;
-    mapping(address => bool)  private _votedList;
-    mapping(uint=>uint) private _votes; // private or public? private lets people make decisions without getting influenced, but may result in a long time before votes actually work
-    uint[] private _supplyVotedOn;
-    uint private _topVotedSupply;
-    uint private _mostVotesNumber;
-
-    event voteReceived(address _voter, uint _num_votes);//, uint _supply);
+    Voting private currentVote;
     event supplyUpdated(uint _new_supply);
     uint public voteEndBlock;
-    uint public votingCost;
+    uint public maxMintSupply;
 
     constructor(address _settings) {
         settings = Settings(_settings);
         activeAddresses.push(address(0)); // the remove function seems to only work if index is > 0?
+        maxMintSupply = settings.maxSupply();
     }
 
     modifier onlyGovernors {
@@ -54,36 +45,16 @@ contract FractDao is Ownable, trackedERC20("FractDao", "FDAO"){
       _;
     }
 
-    /*
-    // compile active addresses - for accounts just about to receive tokens
-    function _addActiveAddress(address account) internal {
-        if (balanceOf(account) == 0) {
-          _activeAddresses.push(account);
-          _indexOfAddress[account] = _activeAddresses.length - 1;
-        }
-    }
-
-    // See https://ethereum.stackexchange.com/questions/35790/efficient-approach-to-delete-element-from-array-in-solidity/41025
-    function _removeActiveAddress(address account) internal {
-      if (balanceOf(account) == 0) {
-        uint index = _indexOfAddress[account];
-        if (index == 0) return;
-
-        if (_activeAddresses.length > 1) {
-          _activeAddresses[index] = _activeAddresses[_activeAddresses.length-1];
-        }
-        delete _activeAddresses[_activeAddresses.length - 1]; // recovers gas from last element storage
-
-        _indexOfAddress[account] = 0;
+    modifier onlyNonVoters {
+      if (block.timestamp < voteEndBlock) {
+        require(currentVote.votability(msg.sender), "CT"); // Cannot transact until voting period ends
       }
+      _;
     }
-    */
-
 
     //mint FDAO supply
     function mintfdao(address account, uint256 amount) public onlyOwner {
         _mint(account, amount);
-        votingCost = totalSupply() / 1000; // starting a vote costs 0.1% of total supply
         _addActiveAddress(account);
     }
 
@@ -98,7 +69,7 @@ contract FractDao is Ownable, trackedERC20("FractDao", "FDAO"){
 
     //mint function for client
     function mint(string memory _name, string memory _symbol, address _token, uint256 _id, uint256 _supply) external returns(address) {
-        require(_supply <= settings.maxSupply(), "Supply is greater than allowed");
+        require(_supply <= settings.maxSupply(), "SG"); // Supply Greater than allowed
 
         //transfer ERC721 to the contract
         //IERC721(_token).setApprovalForAll(address(this), true);
@@ -123,73 +94,38 @@ contract FractDao is Ownable, trackedERC20("FractDao", "FDAO"){
         return this.onERC721Received.selector;
     }
 
-    /*
-    function _beforeTokenTransfer(address sender, address recipient, uint amount) internal override{
-        _addActiveAddress(recipient); // sender should already be recorded by the logic
-    }
 
-    function _afterTokenTransfer(address sender, address recipient, uint amount) internal override{
-        _removeActiveAddress(sender); // sender should already be recorded by the logic
-     }
-    function getVaultforNft(address _nftAddress) public returns(Vault) {
-        Vault vault = records[_nftAddress];
-        return vault;
+    function transfer(address recipient, uint256 amount) public override onlyNonVoters returns (bool) {
+        return super.transfer(recipient, amount);
     }
-    */
 
     // Governance - vote to increase max. supply
+
     function startVote() public onlyGovernors {
-        // burn X amount of governance tokens so voting isn't somehow abused in additioni to gas cost of deploying a contract
+        // burn X amount of governance tokens so voting isn't somehow abused in addition to gas cost of deploying a contract
         require(block.timestamp > voteEndBlock); // require previous voting round to end before starting a new vote
-        _burn(msg.sender, votingCost);
-
+        _burn(msg.sender, totalSupply() / 1000); // starting a vote costs 0.1% of total supply
+        currentVote = new Voting(maxMintSupply);
         voteEndBlock = block.timestamp + 70000; // currently, it is ~6500 blocks/day, so this is about 11 days
-
-        _topVotedSupply = settings.maxSupply();
-        _mostVotesNumber =  0;
-
-        for (uint i=0; i<activeAddresses.length; i++) {
-            _snapshot[activeAddresses[i]] = balanceOf(activeAddresses[i]);
-            _votedList[activeAddresses[i]] = false;
-        }
-
-        for (uint i = 0; i < _supplyVotedOn.length; i++) {
-            _votes[_supplyVotedOn[i]] = 0;
-        }
-        delete _supplyVotedOn;
-
     }
 
     function vote(uint _supply) public onlyGovernors {
         require(block.timestamp <= voteEndBlock);
-        require(settings.maxSupply() <= _supply);
-        require(!_votedList[msg.sender]); // for now, can only vote once per voting event
-
-        _votedList[msg.sender] = true; // check-effects-interaction pattern
-
-        if (_votes[_supply] == 0) {
-          _supplyVotedOn.push(_supply);
-        }
-        _votes[_supply] += _snapshot[msg.sender];
-        if (_votes[_supply] > _mostVotesNumber) {
-          _mostVotesNumber = _votes[_supply];
-          _topVotedSupply = _supply;
-        }
-
-        emit voteReceived(msg.sender, _snapshot[msg.sender]);
+        currentVote.vote(msg.sender, _supply);
     }
 
     function endVote() public onlyGovernors {
         require(block.timestamp > voteEndBlock);
-        require(_mostVotesNumber > (totalSupply() * 4 / 10)); // at least 40% of token holders agree
+        uint result = currentVote.endVote(totalSupply() * 4 / 10); // at least 40% of token holders agree
 
-        // How it affects current holders
-        for (uint i=0; i<vaultAddresses.length; i++) {
-            _adjustSupply(vaultAddresses[i], settings.maxSupply(), _topVotedSupply);
+        if (result != maxMintSupply) {
+          // How it affects current holders
+          for (uint i=0; i<vaultAddresses.length; i++) {
+              _adjustSupply(vaultAddresses[i], maxMintSupply, result);
+          }
+          settings.updateMaxSupply(result);
+          emit supplyUpdated(result);
         }
-
-        settings.updateMaxSupply(_topVotedSupply);
-        emit supplyUpdated(_topVotedSupply);
     }
 
     function _adjustSupply(address _vaultAdd, uint _old_supply, uint _new_supply) internal {
