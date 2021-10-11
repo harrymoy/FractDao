@@ -14,19 +14,27 @@ contract Voting is Ownable{
   uint private _topVotedSupply;
   uint private _mostVotesNumber;
   uint private _oldSupply;
+  uint private _voteEndBlock;
   event voteReceived(address _voter, uint _num_votes);
 
   FractDao private dao;
 
-  constructor(uint __oldSupply) {
+  constructor(uint __oldSupply, uint voteEndBlock) {
     dao = FractDao(msg.sender);
     _activeAddresses = dao.getActiveAddresses();
     _oldSupply = __oldSupply;
     _topVotedSupply = __oldSupply;
+    _voteEndBlock = voteEndBlock;
 
   }
 
-  function vote(address account, uint _supply) public onlyOwner {
+  modifier onlyGovernors(address account) {
+    require(dao.balanceOf(account) > 0);
+    _;
+  }
+
+  function vote(address account, uint _supply) public onlyOwner onlyGovernors(account){
+    require(block.timestamp <= _voteEndBlock);
     require(!_votedList[account], "AV"); // Already Voted (for now, can only vote once per voting event)
     require(_oldSupply <= _supply, "CRS"); // Cannot reduce supply
     _votedList[account] = true; // check-effects-interaction pattern
@@ -43,14 +51,15 @@ contract Voting is Ownable{
     emit voteReceived(account, dao.balanceOf(account));
   }
 
-  function endVote(uint _limit) public onlyOwner returns(uint) {
-    if (_mostVotesNumber > _limit) {
+  function endVote(uint _limit) public onlyOwner view returns(uint) {
+    require(block.timestamp > _voteEndBlock);
+    if (_mostVotesNumber > _limit * 4 / 10) {
       return _topVotedSupply;
     }
     return _oldSupply;
   }
 
-  function votability(address _acc) public returns(bool) {
+  function votability(address _acc) public view returns(bool) {
     return !(_votedList[_acc]);
   }
 
