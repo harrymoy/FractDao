@@ -135,7 +135,7 @@ contract FractDao is Ownable, trackedERC20("FractDao", "FDAO"){
 
     // Governance - vote to increase max. supply
     function startVote() public onlyGovernors {
-        // burn X amount of governance tokens so voting isn't somehow abused
+        // burn X amount of governance tokens so voting isn't somehow abused in additioni to gas cost of deploying a contract
         require(block.timestamp > voteEndBlock); // require previous voting round to end before starting a new vote
         _burn(msg.sender, votingCost);
 
