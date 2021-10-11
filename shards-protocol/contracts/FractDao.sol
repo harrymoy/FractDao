@@ -35,7 +35,6 @@ contract FractDao is Ownable, ERC20("FractDao", "FDAO"){
         uint256 tokenId;
         uint256 supply;
         address newErc20Token;
-
     }
 
     Settings private settings;
@@ -78,6 +77,11 @@ contract FractDao is Ownable, ERC20("FractDao", "FDAO"){
         _addActiveAddress(account);
     }
 
+    function getAllVaults() external returns(address[] memory) {
+        return vaultAddresses;
+    }
+
+
     //mint function for client
     function mint(string memory _name, string memory _symbol, address _token, uint256 _id, uint256 _supply) external returns(address) {
         require(_supply <= settings.maxSupply(), "Supply is greater than allowed");
@@ -94,8 +98,8 @@ contract FractDao is Ownable, ERC20("FractDao", "FDAO"){
         //_newToken.transfer(msg.sender, _supply);
 
         //recordkeeping
-        records[msg.sender] = vault(_name, _symbol, _token, _id, _supply, address(_newToken.getAddress()));
-        vaultAddresses.push(_newToken.getAddress())
+        records[msg.sender] = vault(_name, _symbol, _token, _id, _supply, address(_newToken));
+        vaultAddresses.push(address(_newToken));
 
         return address(_newToken);
     }
