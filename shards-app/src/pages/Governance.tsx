@@ -1,6 +1,5 @@
 import { createStyles, Theme, makeStyles } from "@material-ui/core";
 import { useEffect } from "react";
-import Browse from "../components/Browse";
 
 
 const useStyles = makeStyles((theme: Theme) =>
@@ -9,18 +8,17 @@ const useStyles = makeStyles((theme: Theme) =>
   })
 );
 
-const HomePage = () => {
+const Governance = () => {
     const classes = useStyles();
 
     useEffect(() => {
-        document.title = "FractlDao";
+        document.title = "Governance";
     })
 
     return(<div>
             <div>Fractionalized NFTs</div>
-            <Browse/>
         </div>
     )
 }
 
-export default HomePage;
+export default Governance;
