@@ -6,6 +6,7 @@ import "@openzeppelin/contracts/access/Ownable.sol";
 
 contract Settings is Ownable{
     uint public maxSupply;
+    event supplyUpdated(uint);
 
     constructor() {
         maxSupply = 10;
@@ -13,6 +14,7 @@ contract Settings is Ownable{
 
     function updateMaxSupply(uint _newSupply) external onlyOwner {
         maxSupply = _newSupply;
+        emit supplyUpdated(maxSupply);
     }
 
 
